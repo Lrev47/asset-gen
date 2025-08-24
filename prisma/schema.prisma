@@ -1,0 +1,288 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Authentication Models (Single User)
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  name          String?
+  email         String?
+  sessions      Session[]
+  projects      Project[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+// Core Project Management
+model Project {
+  id            String        @id @default(cuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  description   String
+  type          String        // Website type (e-commerce, SaaS, portfolio, etc.)
+  githubUrl     String?
+  
+  // Legacy fields for migration
+  businessType  String?
+  prdContent    String?
+  schemaContent String?
+  
+  fields        ProjectField[]
+  sessions      GenerationSession[]
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  @@unique([userId, name])
+  @@map("projects")
+}
+
+// Asset Types (Gallery, Profile, Hero Banner, etc.)
+model AssetType {
+  id              String        @id @default(cuid())
+  name            String        @unique
+  displayName     String
+  category        String        // "Headers", "User Content", "Products", "UI Elements"
+  description     String
+  
+  specifications  Json          // Dimensions, formats, requirements
+  defaultTags     TagAssetType[]
+  modelPreferences String       // JSON array of preferred model IDs
+  
+  fields          ProjectField[]
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  @@map("asset_types")
+}
+
+// Project Fields (Individual image requirements)
+model ProjectField {
+  id              String        @id @default(cuid())
+  projectId       String
+  project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  name            String        // "Hero Banner", "Team Photos"
+  description     String
+  assetTypeId     String
+  assetType       AssetType     @relation(fields: [assetTypeId], references: [id])
+  
+  requirements    Json          // Quantity, priority, specific needs
+  
+  // Image-to-Image Support
+  isImageToImage  Boolean       @default(false)
+  sourceFieldId   String?
+  sourceField     ProjectField? @relation("ImageToImageSource", fields: [sourceFieldId], references: [id])
+  derivedFields   ProjectField[] @relation("ImageToImageSource")
+  
+  prompts         Prompt[]
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  @@map("project_fields")
+}
+
+// AI Model Registry
+model AIModel {
+  id              String        @id @default(cuid())
+  name            String        @unique
+  displayName     String
+  provider        String        // "openai", "replicate"
+  modelId         String        // "dall-e-3", "stable-diffusion-xl-base-1.0"
+  
+  // Enhanced categorization
+  category        String        @default("text-to-image") // "text-to-image", "image-to-image", "inpainting", "upscaling", etc.
+  subcategory     String?       // More specific grouping
+  tags            String?       // JSON array of search tags
+  
+  // External integration
+  replicateUrl    String?       // Direct link to Replicate model page
+  documentationUrl String?      // Link to model documentation
+  
+  capabilities    Json          // What it's good at, limitations
+  costPerImage    Float
+  speedRating     Int           // 1-5 scale
+  qualityRating   Int           // 1-5 scale
+  
+  maxDimensions   Json          // Width/height limits
+  supportedFormats String       // JSON array
+  defaultSettings Json          // Default generation settings
+  configurationSchema Json?     // Replicate's input schema
+  
+  // Usage and examples
+  examples        Json?         // Example outputs and use cases
+  usageCount      Int           @default(0)
+  totalCost       Float         @default(0)
+  avgGenerationTime Float?      // Average time in seconds
+  
+  prompts         Prompt[]
+  
+  isActive        Boolean       @default(true)
+  isEnabled       Boolean       @default(true)
+  isFeatured      Boolean       @default(false)
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  @@map("ai_models")
+}
+
+// Tag Library
+model Tag {
+  id            String        @id @default(cuid())
+  name          String        @unique
+  displayName   String
+  category      String        // "Aesthetics", "Composition", "Lighting", etc.
+  subcategory   String?       // More specific grouping
+  description   String?
+  
+  aliases       String        // JSON array of alternative names
+  weight        Float         @default(1.0)  // Importance in prompt (0.1-2.0)
+  conflictsWith String        // JSON array of conflicting tag IDs
+  
+  prompts       PromptTag[]
+  assetTypes    TagAssetType[]
+  
+  usageCount    Int           @default(0)
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  @@map("tags")
+}
+
+// Prompt Management
+model Prompt {
+  id              String        @id @default(cuid())
+  fieldId         String
+  field           ProjectField  @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  
+  version         Int           @default(1)
+  name            String        // User-friendly name
+  content         String        // Main prompt
+  negativePrompt  String?
+  
+  modelId         String
+  model           AIModel       @relation(fields: [modelId], references: [id])
+  
+  settings        Json          // Model-specific settings
+  tags            PromptTag[]
+  
+  status          String        @default("draft") // draft, ready, generating, completed, failed
+  
+  images          GeneratedImage[]
+  sessions        GenerationSession[]
+  
+  // Metadata
+  estimatedCost   Float?
+  tokensUsed      Int?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  @@unique([fieldId, version])
+  @@map("prompts")
+}
+
+// Generated Images
+model GeneratedImage {
+  id              String        @id @default(cuid())
+  promptId        String
+  prompt          Prompt        @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  
+  sessionId       String
+  session         GenerationSession @relation(fields: [sessionId], references: [id])
+  
+  originalUrl     String        // URL from AI service
+  localPath       String?       // Local storage path
+  optimizedPaths  Json          // Different formats/sizes
+  
+  metadata        Json          // Dimensions, format, generation params
+  cost            Float
+  generationTime  Int           // Milliseconds
+  
+  // User feedback
+  rating          Int?          // 1-5 stars
+  selected        Boolean       @default(false)
+  notes           String?
+  
+  // Image-to-image relationships
+  sourceImageId   String?
+  sourceImage     GeneratedImage? @relation("ImageToImageGeneration", fields: [sourceImageId], references: [id])
+  derivedImages   GeneratedImage[] @relation("ImageToImageGeneration")
+  
+  createdAt       DateTime      @default(now())
+  
+  @@map("generated_images")
+}
+
+// Generation Sessions (for tracking batch operations)
+model GenerationSession {
+  id              String        @id @default(cuid())
+  projectId       String
+  project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  name            String        // User-defined name
+  type            String        // "single", "batch", "image-to-image"
+  status          String        @default("pending") // pending, processing, completed, failed, cancelled
+  
+  prompts         Prompt[]
+  images          GeneratedImage[]
+  
+  settings        Json          // Generation configuration
+  totalCost       Float         @default(0)
+  totalImages     Int           @default(0)
+  processingTime  Int?          // Milliseconds
+  
+  errorMessage    String?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  @@map("generation_sessions")
+}
+
+// Junction Tables
+model PromptTag {
+  promptId        String
+  prompt          Prompt        @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  tagId           String
+  tag             Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  weight          Float         @default(1.0) // Override tag's default weight
+  
+  @@id([promptId, tagId])
+  @@map("prompt_tags")
+}
+
+model TagAssetType {
+  tagId           String
+  tag             Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  assetTypeId     String
+  assetType       AssetType     @relation(fields: [assetTypeId], references: [id], onDelete: Cascade)
+  isDefault       Boolean       @default(false)
+  
+  @@id([tagId, assetTypeId])
+  @@map("tag_asset_types")
+}
