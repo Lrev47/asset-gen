@@ -33,6 +33,33 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# Database files
+*.db
+*.sqlite
+
+# Media files and uploads
+uploads/
+outputs/
+media/
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.svg
+*.mp4
+*.mov
+*.avi
+*.webm
+*.mp3
+*.wav
+*.pdf
+
+# Prisma
+prisma/migrations/
+prisma/generated/
+*.db
+*.db-journal
+
 # vercel
 .vercel
 

@@ -4,92 +4,113 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
-- `npm run dev` - Start development server with Turbopack
-- `npm run build` - Build the application with Turbopack  
-- `npm start` - Start production server
+- `npm run dev` - Start development server (runs on port 3022 by default)
+- `npm run build` - Build the application with Next.js
+- `npm start` - Start production server on port 3022
 - `npm run lint` - Run ESLint
 
 ## Database Management
 
-This project uses Prisma with SQLite:
+This project uses Prisma with PostgreSQL:
 
-- Database file: `prisma/dev.db`
+- Database URL configured via `DATABASE_URL` environment variable
 - Schema: `prisma/schema.prisma`
-- Run `npx prisma migrate dev` to apply schema changes
-- Run `npx prisma generate` to update the Prisma client
-- Run `npx prisma studio` to view/edit database contents
+- Run `npm run db:migrate` to apply schema changes during development
+- Run `npm run db:push` to push schema changes without migrations
+- Run `npm run db:deploy` to apply migrations in production
+- Run `npm run db:reset` to reset database and run seed
+- Run `npm run db:seed` to populate with sample data
+- Run `npm run db:studio` to launch Prisma Studio GUI
+- Run `npm run generate` to regenerate Prisma client after schema changes
+
+The schema includes generators for DBML and JSON Schema documentation in `prisma/generated/`.
 
 ## Architecture Overview
 
-### Core Application Structure
+**MediaForge** is a Next.js 15 application for AI-powered media generation and project management.
 
-**Asset Generator Studio** is a Next.js 15 application for AI-powered image generation organized around projects and asset types.
+### Core Domain Models (see `prisma/schema.prisma`)
 
-#### Key Domain Models (see `prisma/schema.prisma`):
+**Primary Entities:**
+- **User**: Platform users with preferences and API keys
+- **Project**: Top-level containers for organizing work (websites, marketing campaigns)
+- **Field**: Specific media requirements within projects (hero banners, galleries, etc.)
+- **Media**: Generated or uploaded assets with versioning support
+- **AiModel**: Registry of available AI models (OpenAI, Replicate, local models)
+- **Generation**: AI generation jobs with status tracking and cost data
+- **Prompt**: Reusable prompts with templates and JSON structure
 
-- **Project**: Top-level container for a website/app project
-- **AssetType**: Categories like "Gallery", "Hero Banner", "Profile Images" 
-- **ProjectField**: Specific image requirements within a project
-- **AIModel**: Registry of available AI models (OpenAI DALL-E, Replicate models)
-- **Prompt**: Generated prompts for specific fields with model assignments
-- **GeneratedImage**: Results from AI generation with metadata and user feedback
-- **GenerationSession**: Tracks batch operations and costs
-- **Tag**: Searchable attributes for prompts and asset types
+**Supporting Models:**
+- **Team/TeamMember/TeamProject**: Multi-user collaboration
+- **Workflow/WorkflowExecution**: Automated generation pipelines  
+- **UsageLog/CostTracking**: Analytics and billing
+- **ApiKey**: External service authentication
 
-#### Application Layers:
+### Application Structure
 
-1. **Pages** (`src/app/`): Next.js App Router pages
-   - Dashboard (`/`) - Project overview
-   - Individual project view (`/project/[id]`) 
-   - Asset types, models, tags management pages
+**Pages** (`src/app/`): Next.js App Router with nested layouts
+- Dashboard (`/`) - Project overview and quick actions
+- Projects (`/projects/[id]`) - Detailed project management with tabbed interface
+- Media management, AI model registry, prompt templates
+- Analytics and settings pages
 
-2. **API Routes** (`src/app/api/`): Server-side logic
-   - Project CRUD operations
-   - AI model integration (OpenAI, Replicate)
-   - Batch processing endpoints
-   - Data initialization and seeding
+**Server Actions** (`src/app/actions/`): 
+- `projects.ts` - Project CRUD operations and listing
+- `project-detail.ts` - Comprehensive project data fetching with metrics
 
-3. **UI Components** (`src/ui/`): Reusable React components
-   - `Dashboard`, `ProjectManager`, `SettingsPanel`
-   - `BatchProcessor`, `ImagePreview`
+**Components** (`src/components/`):
+- `ui/` - Reusable Radix UI components (buttons, cards, forms)
+- `projects/` - Project-specific components including detailed tabbed interface
+- `PlaceholderPage.tsx` - Development template for unimplemented pages
 
-4. **Business Logic** (`src/`):
-   - **Analyzers**: Extract requirements from PRDs and schemas
-   - **Generators**: AI service integrations (OpenAI DALL-E, Replicate models)
-   - **Managers**: Business logic for naming conventions, prompts
-   - **Processors**: Image handling and optimization
-   - **Services**: Core business services for asset types, projects, tags
+**Database Layer** (`src/lib/db/prisma.ts`):
+- Centralized Prisma client with connection management
+- Development vs production logging configuration
+- Health check utilities and graceful shutdown handling
 
-#### AI Integration:
+### Key Design Patterns
 
-- **OpenAI**: DALL-E 3 via `src/generators/openai/dalle.ts`
-- **Replicate**: Multiple models via `src/generators/replicate/`
-- **Prompt Enhancement**: OpenAI GPT for prompt optimization
-- **Image-to-Image**: Support for using generated images as source material
+**No Modals Philosophy**: All interactions use full-page navigation instead of modal dialogs for better UX and accessibility.
 
-#### Data Flow:
+**Dynamic Type System**: Instead of enums, the schema uses string fields (e.g., project `type`, field `type`, media `type`) for maximum flexibility. Types are managed through dedicated tables like `ProjectType`, `FieldType`, `MediaType`.
 
-1. User creates project with description and type
-2. System analyzes requirements and suggests asset types
-3. User defines project fields (specific image needs)  
-4. System generates optimized prompts using templates and tags
-5. AI models generate images based on prompts
-6. Users review, rate, and select images
-7. Export functionality provides organized assets
+**Comprehensive Metadata**: JSON fields (`metadata`, `settings`, `requirements`) store flexible configuration without schema changes.
 
-## Key Integration Points
+**Multi-tenancy Ready**: Team-based access control with role-based permissions stored as JSON.
 
-- **Database**: Prisma ORM with SQLite database
-- **Styling**: TailwindCSS with Radix UI components
-- **Icons**: Heroicons and Lucide React
-- **AI Services**: OpenAI API and Replicate API
-- **Image Processing**: Sharp for optimization
-- **Authentication**: Next-Auth setup (currently unused)
+## Integration Points
 
-## Important File Locations
+**Database**: PostgreSQL via Prisma ORM with automatic client generation
+**Styling**: TailwindCSS with custom design system and dark mode support
+**UI Library**: Radix UI primitives with custom theming
+**Icons**: Lucide React for consistent iconography  
+**AI Services**: OpenAI and Replicate API integrations (implementation pending)
+**Image Processing**: Sharp for optimization and manipulation
+**State Management**: Server Actions + React 19 features, Zustand for client state
 
-- Main schema: `prisma/schema.prisma`  
-- Core business logic: `src/services/`, `src/managers/`
-- AI integrations: `src/generators/`
-- Component library: `src/ui/`, `src/components/`
-- Type definitions: Inferred from Prisma schema
+## Project-Specific Conventions
+
+**Server Actions**: All database operations use Server Actions rather than API routes for type safety and performance.
+
+**File Organization**: 
+- Server Actions in `src/app/actions/`
+- Page components follow Next.js App Router conventions
+- Reusable components in `src/components/` with domain-specific folders
+- Database utilities in `src/lib/db/`
+
+**Type Safety**: 
+- Prisma-generated types exported from `src/lib/db/prisma.ts`
+- Server Action return types defined alongside functions
+- Strict TypeScript configuration
+
+**Component Architecture**:
+- Tabbed interfaces for complex pages (see `ProjectTabs.tsx`)
+- Server Components for data fetching, Client Components for interactivity
+- Consistent prop interfaces with clear data flow patterns
+
+**Error Handling**: 
+- Server Actions return structured results with success/error states
+- Database operations wrapped in try/catch with meaningful error messages
+- Image loading with graceful fallbacks to placeholder icons
+
+The codebase emphasizes developer experience with comprehensive tooling, type safety, and clear separation of concerns between data fetching, business logic, and presentation layers.
