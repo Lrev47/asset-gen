@@ -399,6 +399,53 @@ const pages: PageInfo[] = [
     category: 'settings'
   },
 
+  // Tags Management
+  {
+    name: 'Tags Management',
+    route: '/tags',
+    description: 'Central hub for managing tag categories and tags for prompt enhancement',
+    status: 'complete',
+    priority: 'high',
+    complexity: 'medium',
+    category: 'tags'
+  },
+  {
+    name: 'Create Tag Category',
+    route: '/tags/categories/new',
+    description: 'Create new tag categories for organizing tags by media type and purpose',
+    status: 'complete',
+    priority: 'high',
+    complexity: 'simple',
+    category: 'tags'
+  },
+  {
+    name: 'Edit Tag Category',
+    route: '/tags/categories/[id]/edit',
+    description: 'Edit existing tag categories with media type and organizational settings',
+    status: 'complete',
+    priority: 'medium',
+    complexity: 'simple',
+    category: 'tags'
+  },
+  {
+    name: 'Create Tag in Category',
+    route: '/tags/categories/[id]/tags/new',
+    description: 'Create new tags within specific categories for prompt enhancement',
+    status: 'complete',
+    priority: 'high',
+    complexity: 'simple',
+    category: 'tags'
+  },
+  {
+    name: 'Edit Tag',
+    route: '/tags/tags/[id]/edit',
+    description: 'Edit individual tag properties, values, and media type associations',
+    status: 'complete',
+    priority: 'medium',
+    complexity: 'simple',
+    category: 'tags'
+  },
+
   // Analytics
   {
     name: 'Analytics Dashboard',
@@ -446,6 +493,7 @@ const categories = [
   { key: 'media', name: 'Media Library', icon: '🎨' },
   { key: 'prompts', name: 'Prompt System', icon: '✨' },
   { key: 'models', name: 'Model Management', icon: '🤖' },
+  { key: 'tags', name: 'Tags Management', icon: '🏷️' },
   { key: 'settings', name: 'Settings', icon: '⚙️' },
   { key: 'analytics', name: 'Analytics', icon: '📊' }
 ]

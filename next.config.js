@@ -77,13 +77,7 @@ const nextConfig = {
 
   // Redirects
   async redirects() {
-    return [
-      {
-        source: '/dashboard',
-        destination: '/',
-        permanent: true
-      }
-    ]
+    return []
   }
 }
 

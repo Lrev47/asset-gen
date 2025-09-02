@@ -56,11 +56,30 @@ model User {
   apiKeys         ApiKey[]
   usageLogs       UsageLog[]
   teamMemberships TeamMember[]
+  userModels      UserModel[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("users")
+}
+
+model UserModel {
+  id          String   @id @default(cuid())
+  userId      String
+  modelSlug   String   // e.g., "black-forest-labs/flux-1.1-pro"
+  modelName   String   // cached for display
+  modelType   String   // image/video/audio/text/utility
+  addedAt     DateTime @default(now())
+  lastUsedAt  DateTime?
+  settings    Json?    // user's default parameters for this model
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, modelSlug])
+  @@index([userId])
+  @@index([modelType])
+  @@map("user_models")
 }
 
 model Project {
@@ -141,7 +160,8 @@ model Media {
   promptId String?
   prompt   Prompt? @relation(fields: [promptId], references: [id], onDelete: SetNull)
 
-  versions MediaVersion[]
+  versions    MediaVersion[]
+  mediaTagUsages MediaTag[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -174,23 +194,14 @@ model MediaVersion {
 // ==================== AI MODEL MANAGEMENT ====================
 
 model AiModel {
-  id             String @id @default(cuid())
-  name           String
-  slug           String @unique
-  provider       String // "openai", "replicate", "local", etc.
-  type           String // "text", "image", "video", "audio"
-  deploymentType String // "api", "local"
-
-  capabilities Json // What the model can do
-  config       Json // Model-specific configuration
-  credentials  Json? // Encrypted API keys/endpoints
-  parameters   Json // Default parameters
-  limits       Json // Rate limits, max tokens, etc.
-
-  costPerUse  Float?
-  avgLatency  Int? // Average response time in ms
-  status      String    @default("inactive") // "active", "inactive", "error"
-  lastChecked DateTime?
+  id         String @id @default(cuid())
+  slug       String @unique  // e.g., "black-forest-labs/flux-1.1-pro"
+  provider   String // "replicate", "openai", etc.
+  type       String // "text", "image", "video", "audio", "utility"
+  
+  // Minimal cached data for performance
+  name       String?
+  costPerUse Float?
 
   generations  Generation[]
   modelMetrics ModelMetric[]
@@ -200,7 +211,6 @@ model AiModel {
 
   @@index([provider])
   @@index([type])
-  @@index([status])
   @@map("ai_models")
 }
 
@@ -250,6 +260,7 @@ model Prompt {
   media       Media[]
   generations Generation[]
   templates   PromptTemplate[]
+  promptTagUsages PromptTag[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -533,4 +544,76 @@ model TeamProject {
   @@index([teamId])
   @@index([projectId])
   @@map("team_projects")
+}
+
+// ==================== TAG SYSTEM FOR PROMPT ENHANCEMENT ====================
+
+model TagCategory {
+  id          String  @id @default(cuid())
+  name        String  // "Composition", "Aesthetic", "Mood", etc.
+  slug        String  @unique
+  mediaTypes  String[] // ["image", "video", "audio"] or ["all"]
+  description String?
+  position    Int     @default(0)
+  
+  tags Tag[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([mediaTypes])
+  @@map("tag_categories")
+}
+
+model Tag {
+  id          String   @id @default(cuid())
+  name        String   // "Rule of thirds", "Golden hour", etc.
+  slug        String   @unique
+  value       String   // The actual text to append to prompt
+  description String?
+  mediaTypes  String[] // ["image", "video"] for tags that work across types
+  position    Int      @default(0)
+  
+  categoryId String
+  category   TagCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  
+  mediaTagUsages  MediaTag[]
+  promptTagUsages PromptTag[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([categoryId])
+  @@index([mediaTypes])
+  @@map("tags")
+}
+
+model MediaTag {
+  id      String @id @default(cuid())
+  mediaId String
+  media   Media  @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  tagId   String
+  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([mediaId, tagId])
+  @@index([mediaId])
+  @@index([tagId])
+  @@map("media_tags")
+}
+
+model PromptTag {
+  id       String @id @default(cuid())
+  promptId String
+  prompt   Prompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  tagId    String
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([promptId, tagId])
+  @@index([promptId])
+  @@index([tagId])
+  @@map("prompt_tags")
 }

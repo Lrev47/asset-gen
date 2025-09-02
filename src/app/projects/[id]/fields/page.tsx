@@ -1,42 +1,64 @@
-import PlaceholderPage from '@/components/PlaceholderPage'
+import { notFound } from 'next/navigation'
+import { getProjectById } from '@/app/actions/project-detail'
+import { getProjectFields } from '@/app/actions/fields'
+import FieldManagementDashboard from '@/components/fields/FieldManagementDashboard'
 
-export default function FieldManagementPage() {
-  return (
-    <PlaceholderPage
-      title="Field Management"
-      description="Dynamic field configuration system for defining project requirements, media specifications, and generation parameters"
-      userFlow={[
-        'User views all project fields in an organized dashboard with status indicators',
-        'User clicks "Add Field" to create a new field with type selection wizard',
-        'User configures field requirements including media type, dimensions, style preferences',
-        'User sets field priority and deadline for generation scheduling',
-        'User organizes fields by dragging and dropping for logical grouping',
-        'User initiates bulk generation for multiple fields or individual field generation',
-        'User monitors generation progress and reviews completed assets per field',
-        'User can duplicate successful fields or create templates for reuse'
-      ]}
-      features={[
-        'Drag-and-drop field organization with custom grouping',
-        'Field templates and presets for common use cases',
-        'Bulk field operations (generate, duplicate, archive)',
-        'Progress tracking with completion percentages per field',
-        'Advanced field configuration with conditional requirements',
-        'Field dependency mapping for sequential generation workflows'
-      ]}
-      interactions={{
-        forms: ['Field creation wizard', 'Requirements specification form', 'Batch configuration panel'],
-        actions: ['Add new field', 'Generate media', 'Duplicate field', 'Bulk operations', 'Create template'],
-        displays: ['Field cards with progress bars', 'Media thumbnail grids', 'Status indicators', 'Generation queue', 'Field dependency tree']
-      }}
-      category="Field Management"
-      prismaModels={['Field', 'FieldType', 'Media', 'Generation', 'Project']}
-      dataDescription={[
-        'Field - Display all project fields with current status and progress',
-        'FieldType - Show available field types and their default configurations',
-        'Media - Count and preview media assets for each field',
-        'Generation - Track active and completed generation jobs per field',
-        'Project - Reference parent project for context and permissions'
-      ]}
-    />
-  )
+interface FieldManagementPageProps {
+  params: Promise<{ id: string }>
+}
+
+export default async function FieldManagementPage({ params }: FieldManagementPageProps) {
+  const { id } = await params
+  
+  try {
+    // Fetch project and fields data
+    const [projectResult, fieldsResult] = await Promise.all([
+      getProjectById(id),
+      getProjectFields(id)
+    ])
+
+    if (!projectResult.project) {
+      notFound()
+    }
+
+    const project = projectResult.project
+    const fields = fieldsResult.fields
+
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <FieldManagementDashboard 
+          project={project}
+          fields={fields}
+        />
+      </div>
+    )
+  } catch (error) {
+    console.error('Failed to load field management page:', error)
+    notFound()
+  }
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  
+  try {
+    const projectResult = await getProjectById(id)
+    
+    if (!projectResult.project) {
+      return {
+        title: 'Project Not Found',
+        description: 'The requested project could not be found.'
+      }
+    }
+
+    return {
+      title: `Field Management - ${projectResult.project.name}`,
+      description: `Manage fields and content requirements for ${projectResult.project.name}`,
+    }
+  } catch (error) {
+    return {
+      title: 'Field Management',
+      description: 'Manage project fields and content requirements'
+    }
+  }
 }

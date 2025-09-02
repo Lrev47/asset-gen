@@ -1,10 +1,17 @@
 'use client'
 
 import React from 'react'
-import { Plus, FileText, Image, Edit, Trash2 } from 'lucide-react'
+import Link from 'next/link'
+import { Plus, FileText, Image, Edit, Trash2, Settings, ChevronDown, PenTool, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import type { ProjectWithFullDetails } from '@/app/actions/project-detail'
 import type { Field, Media } from '@prisma/client'
 
@@ -27,10 +34,37 @@ export default function FieldsTab({ project, fields }: FieldsTabProps) {
             Manage the content requirements for this project
           </p>
         </div>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Field
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Link href={`/projects/${project.id}/fields`}>
+            <Button variant="outline">
+              <Settings className="h-4 w-4 mr-2" />
+              Manage Fields
+            </Button>
+          </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Field
+                <ChevronDown className="h-4 w-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/projects/${project.id}/fields/new/manual`}>
+                  <PenTool className="h-4 w-4 mr-2" />
+                  Create Manually
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href={`/projects/${project.id}/fields/new/ai`}>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate with AI
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* Fields List */}
@@ -45,7 +79,11 @@ export default function FieldsTab({ project, fields }: FieldsTabProps) {
                       <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
-                      <CardTitle className="text-base">{field.name}</CardTitle>
+                      <Link href={`/projects/${project.id}/fields/${field.id}`}>
+                        <CardTitle className="text-base hover:text-primary transition-colors cursor-pointer">
+                          {field.name}
+                        </CardTitle>
+                      </Link>
                       <div className="flex items-center space-x-2 mt-1">
                         <Badge variant="outline" className="text-xs">
                           {field.type}
@@ -130,10 +168,29 @@ export default function FieldsTab({ project, fields }: FieldsTabProps) {
               <br />
               Add your first field to get started.
             </p>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Your First Field
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Your First Field
+                  <ChevronDown className="h-4 w-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="center">
+                <DropdownMenuItem asChild>
+                  <Link href={`/projects/${project.id}/fields/new/manual`}>
+                    <PenTool className="h-4 w-4 mr-2" />
+                    Create Manually
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={`/projects/${project.id}/fields/new/ai`}>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Generate with AI
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </CardContent>
         </Card>
       )}

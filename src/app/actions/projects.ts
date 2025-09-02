@@ -5,6 +5,19 @@ import { redirect } from 'next/navigation'
 import prisma from '@/lib/db/prisma'
 import type { Project, Prisma } from '@prisma/client'
 
+// Define proper types for project metadata
+export interface ProjectMetadata {
+  client?: string
+  deadline?: string
+  budget?: string
+  [key: string]: string | undefined
+}
+
+// Define proper types for project settings  
+export interface ProjectSettings {
+  [key: string]: any
+}
+
 // Types for our functions
 export interface ProjectFilters {
   search?: string
@@ -147,14 +160,15 @@ export async function getProjects(params: {
   }
 }
 
-// Create a new project
+// Create a new project with proper typing
 export async function createProject(data: {
   name: string
   description?: string
   type: string
+  status?: string
   userId: string
-  metadata?: any
-  settings?: any
+  metadata?: ProjectMetadata
+  settings?: ProjectSettings
 }) {
   try {
     // Generate slug from name
@@ -177,6 +191,7 @@ export async function createProject(data: {
         slug: uniqueSlug,
         description: data.description || null,
         type: data.type,
+        status: data.status || 'active',
         userId: data.userId,
         metadata: data.metadata || {},
         settings: data.settings || {}
