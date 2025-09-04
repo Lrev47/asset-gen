@@ -55,10 +55,19 @@ export class ReplicateAdapter implements ModelAdapter {
         validation.sanitizedInput || input
       )
 
-      // Create prediction
+      // Create prediction - handle missing versions gracefully
       const createOptions: any = {
-        version: model.config?.version,
         input: transformedInput
+      }
+      
+      // Only add version if it's provided and not empty
+      if (model.config?.version && model.config.version !== '') {
+        createOptions.version = model.config.version
+      } else if (model.config?.replicateId) {
+        // For official models without version, use model identifier
+        createOptions.model = model.config.replicateId
+      } else {
+        throw new AdapterError('Model configuration missing version and replicateId', 'replicate', 400)
       }
       
       if (model.config?.webhookEvents && process.env.REPLICATE_WEBHOOK_URL) {

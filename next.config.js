@@ -21,8 +21,16 @@ const nextConfig = {
         hostname: 'replicate.delivery'
       },
       {
+        protocol: 'https', 
+        hostname: 'replicate.com'
+      },
+      {
         protocol: 'https',
         hostname: 'oaidalleapiprodscus.blob.core.windows.net'
+      },
+      {
+        protocol: 'https',
+        hostname: 'picsum.photos'
       }
     ],
     formats: ['image/webp', 'image/avif'],

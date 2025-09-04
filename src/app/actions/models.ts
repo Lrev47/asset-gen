@@ -16,7 +16,7 @@ import type {
   CostEstimate,
   ModelWithStats
 } from '@/lib/models/types'
-import { createGenerationWithPrompt } from './generation'
+import { createGeneration } from './generation'
 
 // ==================== MODEL FETCHING ====================
 
@@ -243,7 +243,7 @@ export async function createModelGeneration(
       generationInput.fieldId = request.fieldId
     }
 
-    const result = await createGenerationWithPrompt(generationInput)
+    const result = await createGeneration(generationInput)
 
     if (result.error || !result.generation) {
       return { success: false, error: result.error || 'Failed to create generation' }

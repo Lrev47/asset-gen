@@ -446,9 +446,11 @@ export default function DynamicModelForm({
     }
   }
 
-  // Group fields by importance/type
-  const requiredFieldsEntries = Object.entries(schema).filter(([, field]) => field.required && !field.optional)
-  const optionalFieldsEntries = Object.entries(schema).filter(([, field]) => !field.required || field.optional)
+  // Group fields by importance/type, filtering out prompt fields
+  const requiredFieldsEntries = Object.entries(schema).filter(([name, field]) => 
+    (field.required && !field.optional) && !name.toLowerCase().includes('prompt'))
+  const optionalFieldsEntries = Object.entries(schema).filter(([name, field]) => 
+    (!field.required || field.optional) && !name.toLowerCase().includes('prompt'))
 
   return (
     <div className={`space-y-6 ${className}`}>
@@ -546,53 +548,11 @@ export default function DynamicModelForm({
           </Card>
         )}
 
-        {/* Generate Button - Moved closer to required fields */}
-        <Card>
-          <CardContent className="pt-6">
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={loading || disabled}
-              size="lg"
-            >
-              {loading ? (
-                <>
-                  <div className="mr-2 h-4 w-4 border border-current border-t-transparent rounded-full animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                `Generate with ${model.name}`
-              )}
-            </Button>
-            
-            {Object.keys(validationErrors).length > 0 && (
-              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
-                <div className="flex items-center space-x-2">
-                  <AlertCircle className="h-4 w-4 text-red-600" />
-                  <span className="text-sm font-medium text-red-800">
-                    Please fix the following errors:
-                  </span>
-                </div>
-                <ul className="mt-2 text-sm text-red-700 space-y-1">
-                  {Object.entries(validationErrors).map(([field, error]) => (
-                    <li key={field}>• {field}: {error}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Optional Fields */}
         {optionalFieldsEntries.length > 0 && (
           <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-base">Optional Parameters</CardTitle>
-              <CardDescription>
-                Customize these settings to fine-tune your generation
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 pt-6">
               {optionalFieldsEntries.map(([fieldName, fieldSchema]) => (
                 <FormField
                   key={fieldName}

@@ -1,9 +1,8 @@
-import { PrismaClient, Prisma } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
 async function createDefaultUser() {
-  // Create a default user if it doesn't exist
   const existingUser = await prisma.user.findUnique({
     where: { id: 'user-1' }
   })
@@ -23,29 +22,25 @@ async function createDefaultUser() {
   }
 }
 
-// AI Models are now managed through the registry system - no longer seeded
-/*
+// AI Models with complete configuration data (core 4 models)
 const initialModels = [
   {
-    // 1. FLUX.1 [dev] - Image Generation
     name: "FLUX.1 [dev]",
-    slug: "flux-dev",
+    slug: "black-forest-labs/flux-dev",
     provider: "replicate",
     type: "image",
-    deploymentType: "api",
+    costPerUse: 0.055,
     capabilities: {
       operations: ["text-to-image"],
-      supportedFormats: ["webp", "png", "jpg"],
-      maxResolution: "1440x1440",
-      features: ["aspect_ratio", "seed_control", "quality_settings"],
       mediaTypes: ["image"],
+      features: ["aspect_ratio", "seed_control", "quality_settings"],
       streaming: false,
       batch: true,
       webhook: true
     },
     config: {
       replicateId: "black-forest-labs/flux-dev",
-      version: "7360df13418a31f5b4a9cc48e8e2ea345d77b60e1a4674b8edaecc9111a7d77f",
+      version: "6e4a938f85952bdabcc15aa329178c4d681c52bf25a0342403287dc26944661d",
       replicateUrl: "https://replicate.com/black-forest-labs/flux-dev",
       inputSchema: {
         prompt: { 
@@ -99,51 +94,45 @@ const initialModels = [
           description: "Random seed for reproducible results"
         }
       },
-      outputType: "image_urls",
-      supportedFormats: ["webp", "png", "jpg"]
+      outputType: "image_url"
     },
     parameters: {
+      aspect_ratio: "1:1",
       guidance: 3.5,
       num_inference_steps: 28,
       output_format: "webp",
       output_quality: 80,
-      aspect_ratio: "1:1",
       num_outputs: 1
     },
     limits: {
       maxResolution: "1440x1440",
-      maxBatchSize: 4,
-      timeoutSeconds: 300
-    },
-    costPerUse: 0.030,
-    avgLatency: 8000,
-    status: "active"
+      maxOutputs: 4,
+      timeoutSeconds: 600
+    }
   },
   {
-    // 2. Meta Llama 3.1 8B - Text Generation
     name: "Meta Llama 3.1 8B Instruct",
-    slug: "llama-3-1-8b",
+    slug: "meta/meta-llama-3.1-8b-instruct",
     provider: "replicate",
     type: "text",
-    deploymentType: "api",
+    costPerUse: 0.0003,
     capabilities: {
       operations: ["text-generation", "chat", "completion"],
-      maxTokens: 8192,
-      features: ["streaming", "system_prompt", "temperature_control"],
       mediaTypes: ["text"],
+      features: ["temperature_control", "system_prompts", "streaming"],
       streaming: true,
       batch: false,
       webhook: true
     },
     config: {
       replicateId: "meta/meta-llama-3.1-8b-instruct",
-      version: "latest",
+      version: "5292a05c5ad89d9f26a2e0b7b18b782962a02f8bae8b43f32dedd41b0a10ccbc",
       replicateUrl: "https://replicate.com/meta/meta-llama-3.1-8b-instruct",
       inputSchema: {
         prompt: { 
           type: "string", 
-          required: true,
-          description: "Input text prompt for generation"
+          required: true, 
+          description: "Text prompt for generation" 
         },
         system_prompt: { 
           type: "string", 
@@ -171,110 +160,76 @@ const initialModels = [
           default: 0.9,
           description: "Nucleus sampling parameter"
         },
-        min_tokens: { 
-          type: "integer", 
-          min: 0, 
-          default: 0,
-          description: "Minimum number of tokens to generate"
-        },
-        stop_sequences: { 
-          type: "string", 
-          optional: true,
-          description: "Comma-separated list of sequences where generation should stop"
-        },
         seed: { 
           type: "integer", 
           optional: true,
           description: "Random seed for reproducible results"
         }
       },
-      outputType: "text_stream",
-      streaming: true
+      outputType: "text_stream"
     },
     parameters: {
       max_tokens: 1024,
       temperature: 0.7,
-      top_p: 0.9,
-      min_tokens: 0
+      top_p: 0.9
     },
     limits: {
       maxTokens: 8192,
-      timeoutSeconds: 600
-    },
-    costPerUse: 0.00065, // per 1K tokens
-    avgLatency: 2000,
-    status: "active"
+      contextWindow: 128000,
+      timeoutSeconds: 300
+    }
   },
   {
-    // 3. Zeroscope v2 XL - Video Generation
     name: "Zeroscope v2 XL",
-    slug: "zeroscope-v2-xl",
+    slug: "anotherjesse/zeroscope-v2-xl",
     provider: "replicate",
     type: "video",
-    deploymentType: "api",
+    costPerUse: 0.12,
     capabilities: {
       operations: ["text-to-video"],
-      outputFormat: "mp4",
-      maxDuration: 3,
-      maxResolution: "1024x576",
-      features: ["fps_control", "num_frames", "seed_control"],
       mediaTypes: ["video"],
+      features: ["fps_control", "resolution_control", "seed_control"],
       streaming: false,
       batch: false,
       webhook: true
     },
     config: {
       replicateId: "anotherjesse/zeroscope-v2-xl",
-      version: "71996d331e8ede8ef7bd76eba9fae076d31792e4ddf4ad057779b443d6aea62f",
+      version: "9f747673945c62801b13b84701c783929c0ee784e4748ec062204894dda1a351",
       replicateUrl: "https://replicate.com/anotherjesse/zeroscope-v2-xl",
       inputSchema: {
         prompt: { 
           type: "string", 
-          required: true,
-          description: "Text description of the video to generate"
-        },
-        negative_prompt: { 
-          type: "string", 
-          optional: true,
-          description: "Text describing what you don't want in the video"
-        },
-        num_frames: { 
-          type: "integer", 
-          min: 1, 
-          max: 72, 
-          default: 24,
-          description: "Number of frames to generate"
-        },
-        fps: { 
-          type: "integer", 
-          min: 1, 
-          max: 30, 
-          default: 8,
-          description: "Frames per second for the video"
+          required: true, 
+          description: "Text description of the video to generate" 
         },
         width: { 
           type: "integer", 
+          min: 256, 
+          max: 1024, 
           default: 1024,
-          description: "Width of the generated video"
+          description: "Width of the output video"
         },
         height: { 
           type: "integer", 
+          min: 256, 
+          max: 576, 
           default: 576,
-          description: "Height of the generated video"
+          description: "Height of the output video"
         },
-        guidance_scale: { 
-          type: "number", 
-          min: 1, 
-          max: 20, 
-          default: 7.5,
-          description: "Guidance scale for video generation"
-        },
-        num_inference_steps: { 
+        fps: { 
           type: "integer", 
-          min: 1, 
-          max: 100, 
-          default: 50,
-          description: "Number of denoising steps"
+          min: 8, 
+          max: 24, 
+          default: 24,
+          description: "Frames per second"
+        },
+        num_frames: { 
+          type: "integer", 
+          min: 8, 
+          max: 24, 
+          default: 24,
+          description: "Number of frames to generate"
         },
         seed: { 
           type: "integer", 
@@ -282,71 +237,62 @@ const initialModels = [
           description: "Random seed for reproducible results"
         }
       },
-      outputType: "video_url",
-      supportedFormats: ["mp4"]
+      outputType: "video_url"
     },
     parameters: {
-      num_frames: 24,
-      fps: 8,
       width: 1024,
       height: 576,
-      guidance_scale: 7.5,
-      num_inference_steps: 50
+      fps: 24,
+      num_frames: 24
     },
     limits: {
-      maxFrames: 72,
-      maxResolution: "1024x576",
-      maxDuration: 9, // seconds (72 frames / 8 fps)
-      timeoutSeconds: 1800
-    },
-    costPerUse: 0.032,
-    avgLatency: 120000,
-    status: "active"
+      maxDuration: 3,
+      maxFrames: 24,
+      timeoutSeconds: 600
+    }
   },
   {
-    // 4. Whisper Large v3 - Audio Transcription
     name: "Incredibly Fast Whisper",
-    slug: "whisper-v3",
+    slug: "vaibhavs10/incredibly-fast-whisper",
     provider: "replicate",
     type: "audio",
-    deploymentType: "api",
+    costPerUse: 0.0002,
     capabilities: {
-      operations: ["speech-to-text", "translation"],
-      supportedLanguages: ["100+ languages"],
-      features: ["timestamps", "language_detection", "batch_processing"],
+      operations: ["speech-to-text", "transcription"],
       mediaTypes: ["audio"],
+      features: ["language_detection", "timestamp_control", "batch_processing"],
       streaming: false,
       batch: true,
       webhook: true
     },
     config: {
       replicateId: "vaibhavs10/incredibly-fast-whisper",
-      version: "3ab86df6c8f54c11309d4d1f930ac292bad43ace52d10c80d87eb258b3c9f79c",
+      version: "3ab86df6c8f54c11309d4d1f930ac292bad43ace52d10c80d87eb258b3c9f79c6",
       replicateUrl: "https://replicate.com/vaibhavs10/incredibly-fast-whisper",
       inputSchema: {
         audio: { 
           type: "file", 
           required: true, 
           accept: "audio/*",
-          description: "Audio file to transcribe or translate"
+          description: "Audio file to transcribe" 
         },
         task: { 
           type: "enum", 
           options: ["transcribe", "translate"], 
           default: "transcribe",
-          description: "Whether to transcribe or translate the audio"
+          description: "Task to perform: transcribe or translate to English"
         },
         language: { 
-          type: "string", 
-          optional: true, 
-          default: "None",
-          description: "Language of the audio (auto-detect if not specified)"
+          type: "enum", 
+          options: ["auto", "en", "es", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh"], 
+          default: "auto",
+          description: "Language of the audio (auto-detect or specify)"
         },
         timestamp: { 
           type: "enum", 
           options: ["chunk", "word"], 
-          optional: true,
-          description: "Return timestamps at word or chunk level"
+          default: "chunk",
+          description: "Timestamp granularity"
         },
         batch_size: { 
           type: "integer", 
@@ -354,198 +300,22 @@ const initialModels = [
           max: 64, 
           default: 24,
           description: "Batch size for processing"
-        },
-        diarize: { 
-          type: "boolean", 
-          default: false,
-          description: "Enable speaker diarization (identify different speakers)"
         }
       },
-      outputType: "transcript",
-      supportedFormats: ["mp3", "wav", "m4a", "flac", "ogg"]
+      outputType: "transcript"
     },
     parameters: {
       task: "transcribe",
       batch_size: 24,
-      timestamp: "chunk",
-      diarize: false
+      timestamp: "chunk"
     },
     limits: {
       maxFileSize: "25MB",
-      maxDuration: 3600, // 1 hour
+      maxDuration: 3600,
       timeoutSeconds: 600
-    },
-    costPerUse: 0.0002, // per second of audio
-    avgLatency: 5000,
-    status: "active"
-  },
-  {
-    // 5. GPT-4o Transcribe - Speech-to-Text Utility
-    name: "GPT-4o Transcribe",
-    slug: "gpt-4o-transcribe",
-    provider: "replicate",
-    type: "utility",
-    deploymentType: "api",
-    capabilities: {
-      operations: ["speech-to-text", "transcription", "audio-analysis"],
-      supportedFormats: ["mp3", "mp4", "mpeg", "mpga", "m4a", "ogg", "wav", "webm"],
-      maxFileSize: "25MB",
-      features: ["language_detection", "temperature_control", "prompt_guidance"],
-      mediaTypes: ["audio"],
-      streaming: false,
-      batch: false,
-      webhook: true
-    },
-    config: {
-      replicateId: "openai/gpt-4o-transcribe",
-      version: "latest",
-      replicateUrl: "https://replicate.com/openai/gpt-4o-transcribe",
-      inputSchema: {
-        audio_file: { 
-          type: "file", 
-          required: true, 
-          accept: "audio/*",
-          description: "The audio file to transcribe. Supported formats: mp3, mp4, mpeg, mpga, m4a, ogg, wav, or webm" 
-        },
-        language: { 
-          type: "string", 
-          optional: true, 
-          description: "The language of the input audio. Supplying the input language in ISO-639-1 format will improve accuracy and latency"
-        },
-        prompt: { 
-          type: "string", 
-          optional: true,
-          description: "An optional text to guide the model's style or continue a previous audio segment"
-        },
-        temperature: { 
-          type: "number", 
-          min: 0, 
-          max: 1, 
-          optional: true,
-          default: 0,
-          description: "Sampling temperature between 0 and 1"
-        }
-      },
-      outputType: "transcript_array",
-      supportedFormats: ["mp3", "mp4", "mpeg", "mpga", "m4a", "ogg", "wav", "webm"]
-    },
-    parameters: {
-      temperature: 0
-    },
-    limits: {
-      maxFileSize: "25MB",
-      contextWindow: 16000,
-      maxOutputTokens: 2000,
-      timeoutSeconds: 300
-    },
-    costPerUse: 0.0002, // per second of audio
-    avgLatency: 3000,
-    status: "active"
-  },
-  {
-    // 6. Remove Background - Image Processing Utility
-    name: "Remove Background",
-    slug: "remove-bg",
-    provider: "replicate",
-    type: "utility",
-    deploymentType: "api",
-    capabilities: {
-      operations: ["background-removal", "image-processing", "image-editing"],
-      supportedFormats: ["jpg", "jpeg", "png", "webp"],
-      maxFileSize: "10MB",
-      features: ["automatic_detection", "transparent_output"],
-      mediaTypes: ["image"],
-      streaming: false,
-      batch: true,
-      webhook: true
-    },
-    config: {
-      replicateId: "lucataco/remove-bg",
-      version: "latest",
-      replicateUrl: "https://replicate.com/lucataco/remove-bg",
-      inputSchema: {
-        image: { 
-          type: "file", 
-          required: true, 
-          accept: "image/*",
-          description: "Remove background from this image" 
-        }
-      },
-      outputType: "image_url",
-      supportedFormats: ["png"] // Output is always PNG with transparency
-    },
-    parameters: {},
-    limits: {
-      maxFileSize: "10MB",
-      maxResolution: "4096x4096",
-      timeoutSeconds: 120
-    },
-    costPerUse: 0.01,
-    avgLatency: 8000,
-    status: "active"
-  },
-  {
-    // 7. Image Upscaler - Image Enhancement Utility
-    name: "Image Upscaler",
-    slug: "image-upscaler",
-    provider: "replicate",
-    type: "utility",
-    deploymentType: "api",
-    capabilities: {
-      operations: ["image-upscaling", "image-enhancement", "image-processing"],
-      supportedFormats: ["jpg", "jpeg", "png", "webp"],
-      maxFileSize: "10MB",
-      features: ["2x_upscale", "4x_upscale", "quality_control"],
-      mediaTypes: ["image"],
-      streaming: false,
-      batch: true,
-      webhook: true
-    },
-    config: {
-      replicateId: "google/upscaler",
-      version: "latest",
-      replicateUrl: "https://replicate.com/google/upscaler",
-      inputSchema: {
-        image: { 
-          type: "file", 
-          required: true, 
-          accept: "image/*",
-          description: "Image to upscale" 
-        },
-        upscale_factor: { 
-          type: "enum", 
-          options: ["x2", "x4"], 
-          optional: true,
-          default: "x2",
-          description: "Factor by which to upscale the image"
-        },
-        compression_quality: { 
-          type: "integer", 
-          min: 1, 
-          max: 100, 
-          optional: true,
-          default: 80,
-          description: "Compression quality for output (1-100)"
-        }
-      },
-      outputType: "image_url",
-      supportedFormats: ["jpg", "jpeg", "png", "webp"]
-    },
-    parameters: {
-      upscale_factor: "x2",
-      compression_quality: 80
-    },
-    limits: {
-      maxFileSize: "10MB",
-      maxResolution: "4096x4096",
-      timeoutSeconds: 180
-    },
-    costPerUse: 0.02,
-    avgLatency: 12000,
-    status: "active"
+    }
   }
 ]
-*/
 
 async function main() {
   console.log('🌱 Starting database seeding...')
@@ -553,36 +323,22 @@ async function main() {
   // Create default user first
   await createDefaultUser()
 
+  // Seed/update initial models with complete Json data
+  for (const modelData of initialModels) {
+    try {
+      const model = await prisma.aiModel.upsert({
+        where: { slug: modelData.slug },
+        create: modelData,
+        update: modelData
+      })
+
+      console.log(`✅ Upserted model: ${model.name} (${model.slug})`)
+    } catch (error) {
+      console.error(`❌ Error upserting model ${modelData.name}:`, error)
+    }
+  }
+
   console.log('🌱 Database seeded successfully')
-
-  // AI Models are now managed through the registry system
-  // Users can add models from Replicate API directly through the UI
-  
-  // // Seed initial models - COMMENTED OUT
-  // for (const modelData of initialModels) {
-  //   try {
-  //     const existingModel = await prisma.aiModel.findUnique({
-  //       where: { slug: modelData.slug }
-  //     })
-
-  //     if (existingModel) {
-  //       console.log(`⏩ Model ${modelData.name} already exists, skipping...`)
-  //       continue
-  //     }
-
-  //     const model = await prisma.aiModel.create({
-  //       data: {
-  //         ...modelData,
-  //         credentials: Prisma.JsonNull, // Will be set via environment variables
-  //         lastChecked: null
-  //       }
-  //     })
-
-  //     console.log(`✅ Created model: ${model.name} (${model.slug})`)
-  //   } catch (error) {
-  //     console.error(`❌ Error creating model ${modelData.name}:`, error)
-  //   }
-  // }
 
   // Display summary
   const modelCount = await prisma.aiModel.count()

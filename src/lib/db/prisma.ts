@@ -37,11 +37,9 @@ export default prisma
 
 // Type helpers for better TypeScript experience
 export type { 
-  User, Project, Field, Media, MediaVersion,
-  AiModel, ModelMetric, Prompt, PromptTemplate,
-  Generation, ApiKey, ProjectType, FieldType, MediaType,
-  UsageLog, CostTracking, Workflow, WorkflowExecution,
-  Team, TeamMember, TeamProject,
+  User, Media, MediaVersion,
+  AiModel, ModelMetric, UserModel,
+  Generation, ApiKey,
   
   // Prisma types
   Prisma

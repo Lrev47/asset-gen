@@ -2,114 +2,37 @@
 
 import prisma from '@/lib/db/prisma'
 import { revalidatePath } from 'next/cache'
-import type { Prompt, Generation, Media, AiModel } from '@prisma/client'
-
-// Interface for prompt creation
-export interface PromptInput {
-  content: string | Record<string, any>
-  name?: string
-  mediaType: 'image' | 'video' | 'audio' | 'text' | 'document'
-  userId: string
-  fieldId?: string
-  projectId?: string
-  tags?: string[]
-  category?: string
-  isTemplate?: boolean
-}
+import type { Generation, Media, AiModel } from '@prisma/client'
 
 // Interface for generation input
 export interface GenerationInput {
   promptText: string
   modelId: string
   userId: string
-  projectId?: string
-  fieldId?: string
-  type?: 'single' | 'batch' | 'variation'
-  batchSize?: number
+  type?: 'single' | 'multi' | 'variation'
   parameters?: Record<string, any>
 }
 
 // Interface for media creation from generation
 export interface MediaInput {
   generationId: string
-  promptId: string
   name: string
-  type: 'image' | 'video' | 'audio' | 'text' | 'document'
+  type: 'image' | 'video' | 'audio' | 'document'
   format: string
   url: string
   userId: string
-  projectId?: string
-  fieldId?: string
   metadata?: Record<string, any>
   tags?: string[]
 }
 
 /**
- * Create or find a prompt record
- * This ensures we always have a prompt saved for every generation
+ * Create a generation for image creation
  */
-export async function createPromptRecord(input: PromptInput): Promise<{
-  prompt: Prompt | null
-  error?: string
-}> {
-  try {
-    // Generate a unique slug for the prompt
-    const timestamp = Date.now()
-    const slug = `prompt-${input.mediaType}-${timestamp}`
-    
-    // Create the prompt record
-    const prompt = await prisma.prompt.create({
-      data: {
-        name: input.name || `${input.mediaType} prompt ${new Date().toLocaleDateString()}`,
-        slug,
-        mediaType: input.mediaType,
-        content: typeof input.content === 'string' 
-          ? { text: input.content }
-          : input.content,
-        userId: input.userId,
-        tags: input.tags || [],
-        category: input.category || null,
-        isTemplate: input.isTemplate || false,
-        isPublic: false,
-        performance: {
-          usageCount: 0,
-          successRate: 0,
-          averageRating: 0
-        }
-      }
-    })
-
-    return { prompt }
-  } catch (error) {
-    console.error('Error creating prompt record:', error)
-    return { prompt: null, error: 'Failed to create prompt record' }
-  }
-}
-
-/**
- * Create a generation with an associated prompt
- * This ensures every generation has a prompt linked to it
- */
-export async function createGenerationWithPrompt(input: GenerationInput): Promise<{
+export async function createGeneration(input: GenerationInput): Promise<{
   generation: Generation | null
-  prompt: Prompt | null
   error?: string
 }> {
   try {
-    // First, create the prompt record
-    const { prompt, error: promptError } = await createPromptRecord({
-      content: input.promptText,
-      mediaType: 'image', // Default, should be passed based on model type
-      userId: input.userId,
-      ...(input.fieldId && { fieldId: input.fieldId }),
-      ...(input.projectId && { projectId: input.projectId })
-    })
-
-    if (promptError || !prompt) {
-      return { generation: null, prompt: null, error: promptError || 'Failed to create prompt' }
-    }
-
-    // Create the generation linked to the prompt
     const generation = await prisma.generation.create({
       data: {
         type: input.type || 'single',
@@ -117,71 +40,38 @@ export async function createGenerationWithPrompt(input: GenerationInput): Promis
         input: {
           prompt: input.promptText,
           parameters: input.parameters || {},
-          batchSize: input.batchSize || 1,
           timestamp: new Date().toISOString()
         },
         modelId: input.modelId,
-        userId: input.userId,
-        projectId: input.projectId || null,
-        fieldId: input.fieldId || null,
-        promptId: prompt.id // Link to the prompt
+        userId: input.userId
       }
     })
 
-    // Update prompt usage count
-    await prisma.prompt.update({
-      where: { id: prompt.id },
-      data: {
-        performance: {
-          usageCount: 1,
-          successRate: 0,
-          averageRating: 0,
-          lastUsed: new Date().toISOString()
-        }
-      }
-    })
-
-    if (input.projectId) {
-      revalidatePath(`/projects/${input.projectId}`)
-    }
-    if (input.fieldId && input.projectId) {
-      revalidatePath(`/projects/${input.projectId}/fields/${input.fieldId}`)
-    }
-
-    return { generation, prompt }
+    return { generation }
   } catch (error) {
-    console.error('Error creating generation with prompt:', error)
-    return { generation: null, prompt: null, error: 'Failed to create generation' }
+    console.error('Error creating generation:', error)
+    return { generation: null, error: 'Failed to create generation' }
   }
 }
 
 /**
- * Create media from a generation, ensuring prompt is linked
- * This ensures every media item has both generation and prompt references
+ * Create media from a generation
  */
 export async function createMediaFromGeneration(input: MediaInput): Promise<{
   media: Media | null
   error?: string
 }> {
   try {
-    // Verify the generation exists and has a prompt
+    // Verify the generation exists
     const generation = await prisma.generation.findUnique({
-      where: { id: input.generationId },
-      include: { prompt: true }
+      where: { id: input.generationId }
     })
 
     if (!generation) {
       return { media: null, error: 'Generation not found' }
     }
 
-    // Use the prompt from generation if not provided
-    const promptId = input.promptId || generation.promptId
-
-    if (!promptId) {
-      return { media: null, error: 'No prompt associated with this generation' }
-    }
-
-    // Create the media record with both generation and prompt links
+    // Create the media record
     const media = await prisma.media.create({
       data: {
         name: input.name,
@@ -196,10 +86,7 @@ export async function createMediaFromGeneration(input: MediaInput): Promise<{
         },
         tags: input.tags || [],
         userId: input.userId,
-        projectId: input.projectId || null,
-        fieldId: input.fieldId || null,
-        generationId: input.generationId,
-        promptId: promptId // Ensure prompt is always linked
+        generationId: input.generationId
       }
     })
 
@@ -216,37 +103,6 @@ export async function createMediaFromGeneration(input: MediaInput): Promise<{
         }
       }
     })
-
-    // Update prompt performance metrics
-    if (promptId) {
-      const prompt = await prisma.prompt.findUnique({
-        where: { id: promptId },
-        select: { performance: true }
-      })
-      
-      const currentPerformance = prompt?.performance as any || {}
-      await prisma.prompt.update({
-        where: { id: promptId },
-        data: {
-          performance: {
-            ...currentPerformance,
-            usageCount: (currentPerformance.usageCount || 0) + 1,
-            successRate: currentPerformance.usageCount 
-              ? ((currentPerformance.successCount || 0) + 1) / ((currentPerformance.usageCount || 0) + 1) * 100
-              : 100,
-            successCount: (currentPerformance.successCount || 0) + 1,
-            lastUsed: new Date().toISOString()
-          }
-        }
-      })
-    }
-
-    if (input.projectId) {
-      revalidatePath(`/projects/${input.projectId}`)
-    }
-    if (input.fieldId && input.projectId) {
-      revalidatePath(`/projects/${input.projectId}/fields/${input.fieldId}`)
-    }
 
     return { media }
   } catch (error) {
@@ -283,45 +139,10 @@ export async function updateGenerationStatus(
       updateData.duration = duration
     }
 
-    const generation = await prisma.generation.update({
+    await prisma.generation.update({
       where: { id: generationId },
-      data: updateData,
-      include: {
-        project: true,
-        field: true,
-        prompt: true
-      }
+      data: updateData
     })
-
-    // Update prompt performance if generation failed
-    if (status === 'failed' && generation.promptId) {
-      const prompt = await prisma.prompt.findUnique({
-        where: { id: generation.promptId },
-        select: { performance: true }
-      })
-      
-      const currentPerformance = prompt?.performance as any || {}
-      await prisma.prompt.update({
-        where: { id: generation.promptId },
-        data: {
-          performance: {
-            ...currentPerformance,
-            usageCount: (currentPerformance.usageCount || 0) + 1,
-            failureCount: (currentPerformance.failureCount || 0) + 1,
-            successRate: currentPerformance.usageCount 
-              ? (currentPerformance.successCount || 0) / ((currentPerformance.usageCount || 0) + 1) * 100
-              : 0
-          }
-        }
-      })
-    }
-
-    if (generation.projectId) {
-      revalidatePath(`/projects/${generation.projectId}`)
-    }
-    if (generation.fieldId && generation.projectId) {
-      revalidatePath(`/projects/${generation.projectId}/fields/${generation.fieldId}`)
-    }
 
     return { success: true }
   } catch (error) {
@@ -331,17 +152,16 @@ export async function updateGenerationStatus(
 }
 
 /**
- * Get generation with full details including prompt
+ * Get generation with full details
  */
-export async function getGenerationWithPrompt(generationId: string): Promise<{
-  generation: (Generation & { prompt: Prompt | null; model: AiModel }) | null
+export async function getGenerationWithDetails(generationId: string): Promise<{
+  generation: (Generation & { model: AiModel; media?: Media }) | null
   error?: string
 }> {
   try {
     const generation = await prisma.generation.findUnique({
       where: { id: generationId },
       include: {
-        prompt: true,
         model: true,
         media: true
       }
@@ -353,36 +173,35 @@ export async function getGenerationWithPrompt(generationId: string): Promise<{
 
     return { generation: generation as any }
   } catch (error) {
-    console.error('Error fetching generation with prompt:', error)
+    console.error('Error fetching generation:', error)
     return { generation: null, error: 'Failed to fetch generation' }
   }
 }
 
 /**
- * Batch create generations with prompts
- * Used for bulk operations where multiple generations are created at once
+ * Get user's recent generations
  */
-export async function batchCreateGenerations(
-  inputs: GenerationInput[]
+export async function getUserGenerations(
+  userId: string,
+  limit: number = 20
 ): Promise<{
-  generations: Generation[]
-  prompts: Prompt[]
-  errors: string[]
+  generations: (Generation & { model: AiModel; media?: Media })[]
+  error?: string
 }> {
-  const generations: Generation[] = []
-  const prompts: Prompt[] = []
-  const errors: string[] = []
+  try {
+    const generations = await prisma.generation.findMany({
+      where: { userId },
+      include: {
+        model: true,
+        media: true
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit
+    })
 
-  for (const input of inputs) {
-    const { generation, prompt, error } = await createGenerationWithPrompt(input)
-    
-    if (error) {
-      errors.push(error)
-    } else {
-      if (generation) generations.push(generation)
-      if (prompt) prompts.push(prompt)
-    }
+    return { generations: generations as any }
+  } catch (error) {
+    console.error('Error fetching user generations:', error)
+    return { generations: [], error: 'Failed to fetch generations' }
   }
-
-  return { generations, prompts, errors }
 }

@@ -4,7 +4,7 @@ import prisma from '@/lib/db/prisma'
 import type { ModelType } from '@/lib/models/types'
 import { detectModelType, type ReplicateModel } from '@/lib/models/utils/typeDetection'
 
-const DEFAULT_USER_ID = 'user_test123' // Using the same test user as in other actions
+const DEFAULT_USER_ID = 'user-1' // Using the same default user as in our seeded data
 
 interface UserModelData {
   id: string
@@ -15,12 +15,14 @@ interface UserModelData {
   addedAt: Date
   lastUsedAt?: Date | null
   settings?: any
+  coverImageUrl?: string | null
 }
 
 interface AddModelInput {
   modelSlug: string // e.g., "black-forest-labs/flux-1.1-pro"
   modelName: string
   modelType?: ModelType // Optional - will be detected if not provided
+  coverImageUrl?: string | undefined // Optional - cover image URL from the model
 }
 
 // ==================== GET USER MODELS ====================
@@ -37,9 +39,25 @@ export async function getUserModels(userId?: string) {
       ]
     })
 
+    // Get AiModel data for cover images
+    const modelSlugs = userModels.map(m => m.modelSlug)
+    const aiModels = await prisma.aiModel.findMany({
+      where: { slug: { in: modelSlugs } },
+      select: { slug: true, coverImageUrl: true }
+    })
+    
+    const aiModelMap = new Map(aiModels.map(m => [m.slug, m]))
+
+    // Merge user model data with cover images
+    const modelsWithImages: UserModelData[] = userModels.map(model => ({
+      ...model,
+      modelType: model.modelType as ModelType,
+      coverImageUrl: model.coverImageUrl || aiModelMap.get(model.modelSlug)?.coverImageUrl || null
+    }))
+
     return {
       success: true,
-      data: userModels as UserModelData[]
+      data: modelsWithImages
     }
   } catch (error) {
     console.error('Error fetching user models:', error)
@@ -71,9 +89,11 @@ export async function addUserModel(input: AddModelInput, userId?: string) {
       }
     }
 
-    // If modelType not provided, try to detect it from Replicate API
+    // If modelType or coverImageUrl not provided, try to fetch from Replicate API
     let modelType = input.modelType
-    if (!modelType) {
+    let coverImageUrl: string | null = input.coverImageUrl || null
+    
+    if (!modelType || !coverImageUrl) {
       try {
         const replicateResponse = await fetch(
           `https://api.replicate.com/v1/models/${input.modelSlug}`,
@@ -87,13 +107,22 @@ export async function addUserModel(input: AddModelInput, userId?: string) {
 
         if (replicateResponse.ok) {
           const replicateModel: ReplicateModel = await replicateResponse.json()
-          modelType = detectModelType(replicateModel)
+          if (!modelType) {
+            modelType = detectModelType(replicateModel)
+          }
+          if (!coverImageUrl) {
+            coverImageUrl = replicateModel.cover_image_url || null
+          }
         } else {
-          modelType = 'utility' // Default fallback
+          if (!modelType) {
+            modelType = 'utility' // Default fallback
+          }
         }
       } catch (error) {
-        console.warn('Failed to detect model type from Replicate:', error)
-        modelType = 'utility' // Default fallback
+        console.warn('Failed to fetch model data from Replicate:', error)
+        if (!modelType) {
+          modelType = 'utility' // Default fallback
+        }
       }
     }
 
@@ -102,7 +131,8 @@ export async function addUserModel(input: AddModelInput, userId?: string) {
         userId: actualUserId,
         modelSlug: input.modelSlug,
         modelName: input.modelName,
-        modelType: modelType!
+        modelType: modelType!,
+        coverImageUrl
       }
     })
 

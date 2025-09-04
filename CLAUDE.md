@@ -16,12 +16,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This project uses Prisma with PostgreSQL:
 
 - **Required**: `DATABASE_URL` environment variable must be set before running any database commands
-- Schema: `prisma/schema.prisma`
+- Schema: `prisma/schema.prisma` (621 lines with comprehensive domain models)
 - Run `npm run db:migrate` to apply schema changes during development
 - Run `npm run db:push` to push schema changes without migrations
 - Run `npm run db:deploy` to apply migrations in production
 - Run `npm run db:reset` to reset database and run seed
-- Run `npm run db:seed` to populate with sample data
+- Run `npm run db:seed` to populate with sample data (includes 4 starter AI models)
 - Run `npm run db:studio` to launch Prisma Studio GUI
 - Run `npm run generate` to regenerate Prisma client after schema changes
 
@@ -43,6 +43,7 @@ The schema includes generators for DBML and JSON Schema documentation in `prisma
 - **Prompt**: Reusable prompts with templates and JSON structure
 
 **Supporting Models:**
+- **UserModel**: User-specific AI model preferences and configurations
 - **Team/TeamMember/TeamProject**: Multi-user collaboration
 - **Workflow/WorkflowExecution**: Automated generation pipelines  
 - **UsageLog/CostTracking**: Analytics and billing
@@ -66,6 +67,10 @@ The schema includes generators for DBML and JSON Schema documentation in `prisma
 - `field-detail.ts` - Field-specific data operations
 - `generation.ts` - AI generation workflow management
 - `media.ts` - Media asset operations
+- `models.ts` - AI model management and integration (34KB - comprehensive model handling)
+- `userModels.ts` - User-specific model preferences and settings
+- `dashboard.ts` - Dashboard data aggregation and analytics
+- `schema-analysis.ts` - Database schema analysis utilities
 - `tags.ts` - Tag system management
 
 **Components** (`src/components/`):
@@ -73,7 +78,7 @@ The schema includes generators for DBML and JSON Schema documentation in `prisma
 - `projects/` - Project-specific components including detailed tabbed interface
 - `fields/` - Field management components with detail workspace
 - `tags/` - Tag system components for organization and search
-- `PlaceholderPage.tsx` - Development template for unimplemented pages
+- `layout/` - Header, Footer and layout components
 
 **Database Layer** (`src/lib/db/prisma.ts`):
 - Centralized Prisma client with connection management
@@ -131,7 +136,7 @@ return { success: true, data: result } // or { success: false, error: message }
 - Tabbed interfaces for complex pages (see `ProjectTabs.tsx`)
 - Server Components for data fetching, Client Components for interactivity
 - Consistent prop interfaces with clear data flow patterns
-- PlaceholderPage component for rapid prototyping of unimplemented features
+- Extensive use of Radix UI primitives for accessibility and consistency
 
 **Error Handling**: 
 - Server Actions return structured results with success/error states
@@ -139,10 +144,11 @@ return { success: true, data: result } // or { success: false, error: message }
 - Image loading with graceful fallbacks to placeholder icons
 
 **Development Workflow**:
-- Use existing `PlaceholderPage.tsx` component for new feature prototyping
 - Follow the tabbed navigation pattern for complex interfaces
 - Maintain consistency with existing Server Action patterns
 - Leverage the dynamic type system rather than creating new enums
+- Always run `npm run lint` after making changes to ensure code quality
+- Use TypeScript strict mode - all types are properly defined and exported
 
 The codebase emphasizes developer experience with comprehensive tooling, type safety, and clear separation of concerns between data fetching, business logic, and presentation layers.
 

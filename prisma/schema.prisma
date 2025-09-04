@@ -49,14 +49,10 @@ model User {
   avatarUrl   String?
   preferences Json    @default("{}")
 
-  projects        Project[]
-  media           Media[]
-  prompts         Prompt[]
-  generations     Generation[]
-  apiKeys         ApiKey[]
-  usageLogs       UsageLog[]
-  teamMemberships TeamMember[]
-  userModels      UserModel[]
+  media       Media[]
+  generations Generation[]
+  apiKeys     ApiKey[]
+  userModels  UserModel[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -70,6 +66,7 @@ model UserModel {
   modelSlug   String   // e.g., "black-forest-labs/flux-1.1-pro"
   modelName   String   // cached for display
   modelType   String   // image/video/audio/text/utility
+  coverImageUrl String? // cached from AiModel/Replicate API
   addedAt     DateTime @default(now())
   lastUsedAt  DateTime?
   settings    Json?    // user's default parameters for this model
@@ -82,56 +79,6 @@ model UserModel {
   @@map("user_models")
 }
 
-model Project {
-  id          String  @id @default(cuid())
-  name        String
-  slug        String  @unique
-  type        String // "website", "marketing", "portfolio", etc. (dynamic)
-  description String?
-  status      String  @default("active") // "active", "completed", "archived"
-  metadata    Json    @default("{}") // Client info, deadlines, etc.
-  settings    Json    @default("{}") // Project-specific settings
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  fields       Field[]
-  media        Media[]
-  generations  Generation[]
-  workflows    Workflow[]
-  teamProjects TeamProject[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-  @@index([type])
-  @@index([status])
-  @@map("projects")
-}
-
-model Field {
-  id           String  @id @default(cuid())
-  name         String
-  type         String // "gallery", "hero", "testimonials", etc. (dynamic)
-  description  String?
-  requirements Json // Quantity, dimensions, style guidelines
-  position     Int     @default(0)
-  settings     Json    @default("{}") // Field-specific settings
-
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  media       Media[]
-  generations Generation[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([projectId])
-  @@index([type])
-  @@map("fields")
-}
 
 // ==================== MEDIA MODELS ====================
 
@@ -145,29 +92,17 @@ model Media {
   metadata     Json // Dimensions, duration, file size, etc.
   tags         String[] // Array of tags for searching
 
-  projectId String?
-  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-
-  fieldId String?
-  field   Field?  @relation(fields: [fieldId], references: [id], onDelete: SetNull)
-
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   generationId String?     @unique
   generation   Generation? @relation(fields: [generationId], references: [id], onDelete: SetNull)
 
-  promptId String?
-  prompt   Prompt? @relation(fields: [promptId], references: [id], onDelete: SetNull)
-
-  versions    MediaVersion[]
-  mediaTagUsages MediaTag[]
+  versions MediaVersion[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([projectId])
-  @@index([fieldId])
   @@index([userId])
   @@index([type])
   @@index([tags])
@@ -202,6 +137,13 @@ model AiModel {
   // Minimal cached data for performance
   name       String?
   costPerUse Float?
+  coverImageUrl String? // Cached from Replicate API
+  
+  // Extended configuration fields
+  capabilities Json? // Model features, operations, and constraints
+  config       Json? // Provider-specific config (replicateId, inputSchema, etc)
+  parameters   Json? // Default model parameters
+  limits       Json? // Model constraints and limits
 
   generations  Generation[]
   modelMetrics ModelMetric[]
@@ -232,74 +174,12 @@ model ModelMetric {
   @@map("model_metrics")
 }
 
-// ==================== PROMPT MODELS ====================
-
-model Prompt {
-  id        String @id @default(cuid())
-  name      String
-  slug      String
-  mediaType String // "image", "video", "audio", "document"
-  content   Json // The actual JSON prompt structure
-  version   Int    @default(1)
-
-  description String?
-  tags        String[]
-  category    String? // User-defined category
-  isTemplate  Boolean  @default(false)
-  isPublic    Boolean  @default(false)
-
-  performance Json @default("{}") // Usage count, ratings, success rate
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  parentId String?
-  parent   Prompt?  @relation("PromptVersions", fields: [parentId], references: [id], onDelete: SetNull)
-  children Prompt[] @relation("PromptVersions")
-
-  media       Media[]
-  generations Generation[]
-  templates   PromptTemplate[]
-  promptTagUsages PromptTag[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([slug, userId])
-  @@index([userId])
-  @@index([mediaType])
-  @@index([category])
-  @@index([tags])
-  @@map("prompts")
-}
-
-model PromptTemplate {
-  id          String   @id @default(cuid())
-  name        String
-  slug        String   @unique
-  mediaType   String
-  structure   Json // Template structure with variables
-  description String?
-  category    String?
-  tags        String[]
-
-  promptId String?
-  prompt   Prompt? @relation(fields: [promptId], references: [id], onDelete: SetNull)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([mediaType])
-  @@index([category])
-  @@index([tags])
-  @@map("prompt_templates")
-}
 
 // ==================== GENERATION MODELS ====================
 
 model Generation {
   id     String @id @default(cuid())
-  type   String // "single", "batch", "variation"
+  type   String // "single", "multi", "variation"
   status String @default("pending") // "pending", "processing", "completed", "failed"
 
   input    Json // Generation parameters
@@ -307,20 +187,11 @@ model Generation {
   cost     Float?
   duration Int? // Processing time in ms
 
-  projectId String?
-  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-
-  fieldId String?
-  field   Field?  @relation(fields: [fieldId], references: [id], onDelete: SetNull)
-
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   modelId String
   model   AiModel @relation(fields: [modelId], references: [id])
-
-  promptId String?
-  prompt   Prompt? @relation(fields: [promptId], references: [id], onDelete: SetNull)
 
   media Media?
 
@@ -331,8 +202,6 @@ model Generation {
   createdAt   DateTime  @default(now())
   completedAt DateTime?
 
-  @@index([projectId])
-  @@index([fieldId])
   @@index([userId])
   @@index([modelId])
   @@index([status])
@@ -366,254 +235,7 @@ model ApiKey {
   @@map("api_keys")
 }
 
-model ProjectType {
-  id            String  @id @default(cuid())
-  name          String  @unique
-  slug          String  @unique
-  description   String?
-  icon          String?
-  defaultFields Json // Default field structure for this type
-  settings      Json    @default("{}") // Type-specific settings
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
-  @@map("project_types")
-}
 
-model FieldType {
-  id                  String   @id @default(cuid())
-  name                String   @unique
-  slug                String   @unique
-  description         String?
-  icon                String?
-  defaultRequirements Json // Default requirements for this field type
-  compatibleMedia     String[] // Compatible media types
-  settings            Json     @default("{}")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("field_types")
-}
-
-model MediaType {
-  id            String   @id @default(cuid())
-  name          String   @unique
-  slug          String   @unique
-  description   String?
-  extensions    String[] // File extensions
-  mimeTypes     String[] // MIME types
-  defaultParams Json // Default generation parameters
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("media_types")
-}
-
-// ==================== ANALYTICS MODELS ====================
-
-model UsageLog {
-  id           String  @id @default(cuid())
-  action       String // "generation", "upload", "delete", etc.
-  resourceType String // "media", "prompt", "project", etc.
-  resourceId   String?
-  metadata     Json    @default("{}")
-
-  userId    String
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ipAddress String?
-  userAgent String?
-
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([action])
-  @@index([resourceType])
-  @@index([createdAt])
-  @@map("usage_logs")
-}
-
-model CostTracking {
-  id        String   @id @default(cuid())
-  period    DateTime // Month/day for aggregation
-  projectId String?
-  modelId   String?
-  mediaType String?
-
-  generationCount Int   @default(0)
-  totalCost       Float @default(0)
-
-  @@unique([period, projectId, modelId, mediaType])
-  @@index([period])
-  @@index([projectId])
-  @@index([modelId])
-  @@map("cost_tracking")
-}
-
-// ==================== WORKFLOW MODELS ====================
-
-model Workflow {
-  id          String  @id @default(cuid())
-  name        String
-  description String?
-  steps       Json // Array of workflow steps
-  triggers    Json // Workflow triggers
-  settings    Json    @default("{}")
-
-  projectId String?
-  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-
-  executions WorkflowExecution[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([projectId])
-  @@map("workflows")
-}
-
-model WorkflowExecution {
-  id       String @id @default(cuid())
-  status   String @default("pending") // "pending", "running", "completed", "failed"
-  input    Json // Input data
-  output   Json? // Output data
-  logs     Json[] // Execution logs
-  duration Int? // Execution time in ms
-
-  workflowId String
-  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-
-  createdAt   DateTime  @default(now())
-  completedAt DateTime?
-
-  @@index([workflowId])
-  @@index([status])
-  @@map("workflow_executions")
-}
-
-// ==================== COLLABORATION MODELS ====================
-
-model Team {
-  id          String  @id @default(cuid())
-  name        String
-  slug        String  @unique
-  description String?
-
-  members  TeamMember[]
-  projects TeamProject[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("teams")
-}
-
-model TeamMember {
-  id          String @id @default(cuid())
-  role        String // "owner", "admin", "member", "viewer"
-  permissions Json   @default("{}")
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  teamId String
-  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
-
-  joinedAt DateTime @default(now())
-
-  @@unique([userId, teamId])
-  @@index([teamId])
-  @@map("team_members")
-}
-
-model TeamProject {
-  id          String @id @default(cuid())
-  permissions Json   @default("{}")
-
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  teamId String
-  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
-
-  sharedAt DateTime @default(now())
-
-  @@unique([projectId, teamId])
-  @@index([teamId])
-  @@index([projectId])
-  @@map("team_projects")
-}
-
-// ==================== TAG SYSTEM FOR PROMPT ENHANCEMENT ====================
-
-model TagCategory {
-  id          String  @id @default(cuid())
-  name        String  // "Composition", "Aesthetic", "Mood", etc.
-  slug        String  @unique
-  mediaTypes  String[] // ["image", "video", "audio"] or ["all"]
-  description String?
-  position    Int     @default(0)
-  
-  tags Tag[]
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  @@index([mediaTypes])
-  @@map("tag_categories")
-}
-
-model Tag {
-  id          String   @id @default(cuid())
-  name        String   // "Rule of thirds", "Golden hour", etc.
-  slug        String   @unique
-  value       String   // The actual text to append to prompt
-  description String?
-  mediaTypes  String[] // ["image", "video"] for tags that work across types
-  position    Int      @default(0)
-  
-  categoryId String
-  category   TagCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  
-  mediaTagUsages  MediaTag[]
-  promptTagUsages PromptTag[]
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  @@index([categoryId])
-  @@index([mediaTypes])
-  @@map("tags")
-}
-
-model MediaTag {
-  id      String @id @default(cuid())
-  mediaId String
-  media   Media  @relation(fields: [mediaId], references: [id], onDelete: Cascade)
-  tagId   String
-  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
-  
-  createdAt DateTime @default(now())
-  
-  @@unique([mediaId, tagId])
-  @@index([mediaId])
-  @@index([tagId])
-  @@map("media_tags")
-}
-
-model PromptTag {
-  id       String @id @default(cuid())
-  promptId String
-  prompt   Prompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
-  tagId    String
-  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
-  
-  createdAt DateTime @default(now())
-  
-  @@unique([promptId, tagId])
-  @@index([promptId])
-  @@index([tagId])
-  @@map("prompt_tags")
-}
