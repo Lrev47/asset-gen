@@ -35,6 +35,11 @@ export default function ImageGeneratorPage() {
   ])
   const [modelConfig, setModelConfig] = useState<PredictionInput>({})
 
+  // Variation generation state
+  const [basePrompt, setBasePrompt] = useState<string>('')
+  const [variationInstructions, setVariationInstructions] = useState<string>('')
+  const [isGeneratingVariations, setIsGeneratingVariations] = useState(false)
+
   // Load image models on component mount
   useEffect(() => {
     loadImageModels()
@@ -77,6 +82,42 @@ export default function ImageGeneratorPage() {
     }
     
     await generateImage(pairId, pair.prompt, modelConfig)
+  }
+
+  const handleGenerateVariations = async () => {
+    if (!basePrompt || !variationInstructions) return
+    
+    setIsGeneratingVariations(true)
+    
+    try {
+      const result = await generatePromptVariations(
+        basePrompt,
+        variationInstructions,
+        promptImagePairs.length
+      )
+      
+      if (result.success && result.variations) {
+        // Update each prompt pair with generated variations
+        setPromptImagePairs(prev => 
+          prev.map((pair, index) => ({
+            ...pair,
+            prompt: result.variations![index] || basePrompt,
+            // Clear any existing images when updating prompts
+            imageUrl: undefined,
+            error: undefined,
+            isGenerating: false
+          }))
+        )
+      } else {
+        console.error('Failed to generate variations:', result.error)
+        // TODO: Add toast notification for error
+      }
+    } catch (error) {
+      console.error('Error generating variations:', error)
+      // TODO: Add toast notification for error
+    } finally {
+      setIsGeneratingVariations(false)
+    }
   }
 
   const generateImage = async (pairId: string, prompt: string, config: PredictionInput) => {
@@ -368,6 +409,53 @@ export default function ImageGeneratorPage() {
               
               <CardContent className="flex-1 overflow-y-auto max-h-[calc(100vh-20rem)]">
                 <div className="space-y-6">
+                  {generationMode === 'multi' && (
+                    <div className="mb-6 p-4 border rounded-lg bg-muted/50">
+                      <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <Brain className="h-4 w-4" />
+                        AI Prompt Variations
+                      </h3>
+                      <div className="grid grid-cols-2 gap-4 mb-3">
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground block mb-1">Base Prompt</label>
+                          <textarea 
+                            value={basePrompt}
+                            onChange={(e) => setBasePrompt(e.target.value)}
+                            placeholder="Describe your base image..."
+                            className="w-full h-24 px-3 py-2 text-sm bg-background border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground block mb-1">Variation Instructions</label>
+                          <textarea 
+                            value={variationInstructions}
+                            onChange={(e) => setVariationInstructions(e.target.value)}
+                            placeholder="E.g., Create variations with different colors, materials, and styles"
+                            className="w-full h-24 px-3 py-2 text-sm bg-background border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                      <Button 
+                        onClick={handleGenerateVariations}
+                        disabled={!basePrompt || !variationInstructions || promptImagePairs.length === 0 || isGeneratingVariations}
+                        className="w-full"
+                        size="sm"
+                      >
+                        {isGeneratingVariations ? (
+                          <>
+                            <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            Generating Variations...
+                          </>
+                        ) : (
+                          <>
+                            <Brain className="mr-2 h-4 w-4" />
+                            Generate Variations for {promptImagePairs.length} Prompt{promptImagePairs.length !== 1 ? 's' : ''}
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                  
                   {promptImagePairs.map((pair, index) => (
                     <PromptImagePairComponent
                       key={pair.id}
